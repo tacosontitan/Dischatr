@@ -34,7 +34,17 @@ namespace Dischatr {
         /// <summary>
         /// What nickname should the chatbot give itself?
         /// </summary>
-        public string Nickname { get; set; } = "Dischatr";
+        public string Nickname { get; set; } = "Dischatr Bot";
+        /// <summary>
+        /// The current status message for the chatbot.
+        /// </summary>
+        /// <remarks>This is paired with StatusActivityType by Discord.</remarks>
+        public string Status { get; set; } = "to your conversations";
+        /// <summary>
+        /// The current activity type for the chatbot's status.
+        /// </summary>
+        /// <remarks>This is paired with Status by Discord.</remarks>
+        public ActivityType StatusActivityType { get; set; } = ActivityType.Listening;
         /// <summary>
         /// The mention for the chatbot.
         /// </summary>
