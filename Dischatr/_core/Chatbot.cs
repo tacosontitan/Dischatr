@@ -232,11 +232,11 @@ namespace Dischatr {
         }
         private void Command_ReplyingWithMessage(object sender, ChatbotCommandResponse<string> e) {
             var channel = _discordClient.GetChannel(e.OriginalMessage.Channel.Id) as IMessageChannel;
-            channel.SendMessageAsync(e.Data).GetAwaiter().GetResult();
+            channel.SendMessageAsync(text: e.Data);
         }
         private void Command_ReplyingWithEmbed(object sender, ChatbotCommandResponse<Embed> e) {
             var channel = _discordClient.GetChannel(e.OriginalMessage.Channel.Id) as IMessageChannel;
-            channel.SendMessageAsync(null, false, e.Data).GetAwaiter().GetResult();
+            channel.SendMessageAsync(null, false, e.Data);
         }
 
         #endregion
