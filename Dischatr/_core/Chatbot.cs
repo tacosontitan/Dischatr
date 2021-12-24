@@ -24,6 +24,10 @@ namespace Dischatr {
         /// </summary>
         public bool SendHelpDirectlyToUsers { get; set; } = true;
         /// <summary>
+        /// Should the command list be sent directly to users?
+        /// </summary>
+        public bool SendCommandListDirectlyToUsers { get; set; } = true;
+        /// <summary>
         /// Should the chatbot ignore messages from other bots?
         /// </summary>
         public bool IgnoreBotMessages { get; set; } = true;
@@ -190,6 +194,11 @@ namespace Dischatr {
                     try {
                         if (commandPacket.Key.Equals("help", StringComparison.InvariantCultureIgnoreCase))
                             ExecuteHelpCommand(message);
+                        else if (commandPacket.Key.Equals("commands", StringComparison.InvariantCultureIgnoreCase) ||
+                                 commandPacket.Key.Equals("cmds", StringComparison.InvariantCultureIgnoreCase) ||
+                                 commandPacket.Key.Equals("cmd", StringComparison.InvariantCultureIgnoreCase) ||
+                                 commandPacket.Key.Equals("list", StringComparison.InvariantCultureIgnoreCase))
+                            ExecuteListCommand(message);
                         else if (_commands.Any(command => command.Key.Equals(commandPacket.Key, StringComparison.InvariantCultureIgnoreCase))) {
                             var command = _commands.FirstOrDefault(command => command.Key.Equals(commandPacket.Key, StringComparison.InvariantCultureIgnoreCase));
                             if (command != null)
@@ -235,15 +244,30 @@ namespace Dischatr {
         #region Built-In Commands
 
         private void ExecuteHelpCommand(SocketMessage message) {
-            EmbedBuilder embedBuilder = new EmbedBuilder();
-            embedBuilder.Color = Color.Red;
-            embedBuilder.Title = $"Dischatr Help";
-            embedBuilder.Description = @$"Oh, umm, hello there! 👋
+            EmbedBuilder embedBuilder = new EmbedBuilder {
+                Color = Color.Red,
+                Title = $"Dischatr Help",
+                Description = @$"Oh, umm, hello there! 👋
 
-Sorry that you're having trouble using me. If it's a list of available commands you're after, then you can use the `{CommandPrefix}commands` command to get that information. If that's not what you're looking for, then this bot was built with Dischatr. You can find more information on the official GitHub by clicking this embedded message.";
-            embedBuilder.Url = "https://github.com/tacosontitan/Dischatr/wiki";
+Sorry that you're having trouble using me. If it's a list of available commands you're after, then you can use the `{CommandPrefix}commands` command to get that information. If that's not what you're looking for, then this bot was built with Dischatr. You can find more information on the official GitHub by clicking this embedded message.",
+                Url = "https://github.com/tacosontitan/Dischatr/wiki"
+            };
 
             if (SendHelpDirectlyToUsers)
+                message.Author.SendMessageAsync(embed: embedBuilder.Build());
+            else
+                Command_ReplyingWithEmbed(this, new(message, embedBuilder.Build()));
+        }
+        private void ExecuteListCommand(SocketMessage message) {
+            EmbedBuilder embedBuilder = new EmbedBuilder {
+                Color = Color.Red,
+                Title = $"Dischatr Commands",
+                Description = @$"You need a list of commands? I got you fam! Prefix any of the following with `{CommandPrefix}` and you're ready to go!
+
+```{string.Join('\n', _commands.Select(s => s.Key))}```"
+            };
+
+            if (SendCommandListDirectlyToUsers)
                 message.Author.SendMessageAsync(embed: embedBuilder.Build());
             else
                 Command_ReplyingWithEmbed(this, new(message, embedBuilder.Build()));
