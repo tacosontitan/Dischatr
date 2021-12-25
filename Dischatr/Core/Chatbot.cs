@@ -68,10 +68,13 @@ namespace Dischatr {
         public void Initialize() {
             OnInitializing();
 
-            ChatbotCommandService.Instance.ExceptionOccurred += Instance_ExceptionOccurred;
+            // Initialize the command service and subscribe to its events.
+            ChatbotCommandService.Instance.Initialize();
+            ChatbotCommandService.Instance.ExceptionOccurred += CommandService_ExceptionOccurred;
             ChatbotCommandService.Instance.MessageReceived += Command_ReplyingWithMessage;
             ChatbotCommandService.Instance.EmbedReceived += Command_ReplyingWithEmbed;
 
+            // Initialize the Discord client and subscribe to its events.
             _discordClient = new DiscordSocketClient();
             _discordClient.MessageReceived += DiscordMessageReceived;
             _discordClient.Connected += Connected;
@@ -80,10 +83,6 @@ namespace Dischatr {
 
             // Login and run the bot.
             LoginAndRunAsync().GetAwaiter().GetResult();
-        }
-
-        private void Instance_ExceptionOccurred(object sender, Exception e) {
-            throw new NotImplementedException();
         }
 
         #endregion
@@ -140,6 +139,7 @@ namespace Dischatr {
             var channel = _discordClient.GetChannel(e.OriginalMessage.Channel.Id) as IMessageChannel;
             channel.SendMessageAsync(null, false, e.Data);
         }
+        private void CommandService_ExceptionOccurred(object sender, Exception e) => OnExceptionOccurred(e);
 
         #endregion
 
