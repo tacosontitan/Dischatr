@@ -1,9 +1,6 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Dischatr {
@@ -13,32 +10,15 @@ namespace Dischatr {
 
         private readonly string _accessToken = string.Empty;
         private DiscordSocketClient _discordClient = null;
-        private List<ChatbotCommand> _commands = new List<ChatbotCommand>();
 
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// Should the help command results be sent directly to users?
-        /// </summary>
-        public bool SendHelpDirectlyToUsers { get; set; } = true;
-        /// <summary>
-        /// Should the command list be sent directly to users?
-        /// </summary>
-        public bool SendCommandListDirectlyToUsers { get; set; } = true;
-        /// <summary>
         /// Should the chatbot ignore messages from other bots?
         /// </summary>
         public bool IgnoreBotMessages { get; set; } = true;
-        /// <summary>
-        /// What string should initiate commands with the chatbot?
-        /// </summary>
-        public string CommandPrefix { get; set; } = "!";
-        /// <summary>
-        /// What string should terminate commands with the chatbot?
-        /// </summary>
-        public string CommandTerminator { get; set; } = ";";
         /// <summary>
         /// What nickname should the chatbot give itself?
         /// </summary>
@@ -87,6 +67,14 @@ namespace Dischatr {
         /// <remarks>This method will subscribe to events for the client, login, and run the chatbot's code until application closure.</remarks>
         public void Initialize() {
             OnInitializing();
+
+            // Initialize the command service and subscribe to its events.
+            ChatbotCommandService.Instance.Initialize();
+            ChatbotCommandService.Instance.ExceptionOccurred += CommandService_ExceptionOccurred;
+            ChatbotCommandService.Instance.MessageReceived += Command_ReplyingWithMessage;
+            ChatbotCommandService.Instance.EmbedReceived += Command_ReplyingWithEmbed;
+
+            // Initialize the Discord client and subscribe to its events.
             _discordClient = new DiscordSocketClient();
             _discordClient.MessageReceived += DiscordMessageReceived;
             _discordClient.Connected += Connected;
@@ -95,64 +83,6 @@ namespace Dischatr {
 
             // Login and run the bot.
             LoginAndRunAsync().GetAwaiter().GetResult();
-        }
-
-        #endregion
-
-        #region Protected Methods
-
-        /// <summary>
-        /// Attempt to retrieve command packets from a message.
-        /// </summary>
-        /// <param name="message">The message to read from.</param>
-        /// <param name="commandPackets">The retrieved command packets.</param>
-        /// <returns>Returns true if no errors were encountered while retrieving command packets, otherwise false.</returns>
-        protected virtual bool TryGetCommandPackets(SocketMessage socketMessage, out IEnumerable<CommandPacket> commandPackets) {
-            // Create an object to represent the final collection of packets.
-            var packets = new List<CommandPacket>();
-            var message = socketMessage.Content;
-            commandPackets = null;
-
-            // Get all potential commands.
-            try {
-                string[] potentialCommands = message.Split(CommandPrefix);
-                if (potentialCommands?.Length > 0) {
-                    foreach (string potentialCommand in potentialCommands) {
-
-                        // Get the contained command data.
-                        string containedCommand = potentialCommand;
-                        if (potentialCommand.Contains(CommandTerminator))
-                            containedCommand = potentialCommand.Substring(0, potentialCommand.IndexOf(CommandTerminator));
-
-                        // Split on white space to get the command key and parameters.
-                        var key = string.Empty;
-                        var arguments = new List<string>();
-                        string[] commandLineSplitOnWhiteSpace = containedCommand.Split(' ');
-                        if (commandLineSplitOnWhiteSpace.Length > 0) {
-                            key = commandLineSplitOnWhiteSpace[0];
-
-                            // Get any arguments for the packet.
-                            if (commandLineSplitOnWhiteSpace.Length > 1) {
-                                string[] rawArguments = containedCommand.Replace(key, string.Empty).Split(',');
-                                var cleanArguments = new List<string>();
-                                foreach (string rawArgument in rawArguments)
-                                    cleanArguments.Add(rawArgument.Trim());
-
-                                arguments = cleanArguments;
-                            }
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(key))
-                            packets.Add(new CommandPacket(socketMessage, key, arguments.Count > 0 ? arguments.ToArray() : null));
-                    }
-                }
-            } catch (Exception e) {
-                OnExceptionOccurred(e);
-                return false;
-            }
-
-            commandPackets = packets;
-            return true;
         }
 
         #endregion
@@ -189,26 +119,7 @@ namespace Dischatr {
                 return Task.CompletedTask;
 
             // Attempt to process any commands that may be present.
-            if (TryGetCommandPackets(message, out IEnumerable<CommandPacket> commandPackets)) {
-                foreach (var commandPacket in commandPackets) {
-                    try {
-                        if (commandPacket.Key.Equals("help", StringComparison.InvariantCultureIgnoreCase))
-                            ExecuteHelpCommand(message);
-                        else if (commandPacket.Key.Equals("commands", StringComparison.InvariantCultureIgnoreCase) ||
-                                 commandPacket.Key.Equals("cmds", StringComparison.InvariantCultureIgnoreCase) ||
-                                 commandPacket.Key.Equals("cmd", StringComparison.InvariantCultureIgnoreCase) ||
-                                 commandPacket.Key.Equals("list", StringComparison.InvariantCultureIgnoreCase))
-                            ExecuteListCommand(message);
-                        else if (_commands.Any(command => command.Key.Equals(commandPacket.Key, StringComparison.InvariantCultureIgnoreCase))) {
-                            var command = _commands.FirstOrDefault(command => command.Key.Equals(commandPacket.Key, StringComparison.InvariantCultureIgnoreCase));
-                            if (command != null)
-                                command.Invoke(message, commandPacket.Parameters?.ToArray());
-                        }
-                    }
-                    catch (Exception e) { OnExceptionOccurred(e); }
-                }
-            }
-
+            ChatbotCommandService.Instance.ProcessSocketMessage(message);
             return Task.CompletedTask;
         }
         private Task DiscordClient_JoinedGuild(SocketGuild arg) {
@@ -217,17 +128,7 @@ namespace Dischatr {
         }
         private void DiscoverCommands() {
             OnDiscoveringCommands();
-            var commandAssembly = Assembly.GetEntryAssembly();
-            IEnumerable<Type> commandTypes = commandAssembly.GetTypes().Where(w => !w.IsAbstract && w.GetType() != typeof(ChatbotCommand) && typeof(ChatbotCommand).IsAssignableFrom(w));
-            foreach (Type commandType in commandTypes) {
-                try {
-                    var command = (ChatbotCommand)Activator.CreateInstance(commandType);
-                    command.ReplyingWithEmbed += Command_ReplyingWithEmbed;
-                    command.ReplyingWithMessage += Command_ReplyingWithMessage;
-                    _commands.Add(command);
-                } catch (Exception e) { OnExceptionOccurred(e); }
-            }
-
+            ChatbotCommandService.Instance.Discover();
             OnCommandsDiscovered();
         }
         private void Command_ReplyingWithMessage(object sender, ChatbotCommandResponse<string> e) {
@@ -238,40 +139,7 @@ namespace Dischatr {
             var channel = _discordClient.GetChannel(e.OriginalMessage.Channel.Id) as IMessageChannel;
             channel.SendMessageAsync(null, false, e.Data);
         }
-
-        #endregion
-
-        #region Built-In Commands
-
-        private void ExecuteHelpCommand(SocketMessage message) {
-            EmbedBuilder embedBuilder = new EmbedBuilder {
-                Color = Color.Red,
-                Title = $"Dischatr Help",
-                Description = @$"Oh, umm, hello there! 👋
-
-Sorry that you're having trouble using me. If it's a list of available commands you're after, then you can use the `{CommandPrefix}commands` command to get that information. If that's not what you're looking for, then this bot was built with Dischatr. You can find more information on the official GitHub by clicking this embedded message.",
-                Url = "https://github.com/tacosontitan/Dischatr/wiki"
-            };
-
-            if (SendHelpDirectlyToUsers)
-                message.Author.SendMessageAsync(embed: embedBuilder.Build());
-            else
-                Command_ReplyingWithEmbed(this, new(message, embedBuilder.Build()));
-        }
-        private void ExecuteListCommand(SocketMessage message) {
-            EmbedBuilder embedBuilder = new EmbedBuilder {
-                Color = Color.Red,
-                Title = $"Dischatr Commands",
-                Description = @$"You need a list of commands? I got you fam! Prefix any of the following with `{CommandPrefix}` and you're ready to go!
-
-```{string.Join('\n', _commands.Select(s => s.Key))}```"
-            };
-
-            if (SendCommandListDirectlyToUsers)
-                message.Author.SendMessageAsync(embed: embedBuilder.Build());
-            else
-                Command_ReplyingWithEmbed(this, new(message, embedBuilder.Build()));
-        }
+        private void CommandService_ExceptionOccurred(object sender, Exception e) => OnExceptionOccurred(e);
 
         #endregion
 
