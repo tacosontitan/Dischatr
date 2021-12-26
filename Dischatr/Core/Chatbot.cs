@@ -123,7 +123,8 @@ namespace Dischatr {
             return Task.CompletedTask;
         }
         private Task DiscordClient_JoinedGuild(SocketGuild arg) {
-            arg.CurrentUser.ModifyAsync(x => x.Nickname = Nickname);
+            if (!string.IsNullOrWhiteSpace(Nickname))
+                arg.CurrentUser.ModifyAsync(x => x.Nickname = Nickname);
             return Task.CompletedTask;
         }
         private void DiscoverCommands() {
