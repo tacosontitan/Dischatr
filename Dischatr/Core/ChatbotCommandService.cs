@@ -69,7 +69,7 @@ namespace Dischatr {
                 var commandAssembly = Assembly.GetEntryAssembly();
                 var currentAssembly = Assembly.GetExecutingAssembly();
                 var types = commandAssembly.GetTypes().Union(currentAssembly.GetTypes());
-                IEnumerable<Type> commandTypes = types.Where(w => !w.IsAbstract && w.GetType() != typeof(ChatbotCommand) && typeof(ChatbotCommand).IsAssignableFrom(w));
+                IEnumerable<Type> commandTypes = types.Where(w => !w.IsAbstract && typeof(ChatbotCommand).IsAssignableFrom(w));
                 foreach (Type commandType in commandTypes) {
                     try {
                         var command = (ChatbotCommand)Activator.CreateInstance(commandType);
