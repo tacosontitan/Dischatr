@@ -92,8 +92,8 @@ namespace Dischatr {
         private async Task LoginAndRunAsync() {
             OnConnectionStateChanged(ConnectionState.Connecting);
             await _discordClient.LoginAsync(TokenType.Bot, _accessToken);
+            await _discordClient.SetGameAsync(name: Status, type: StatusActivityType);
             OnInitialized();
-
             DiscoverCommands();
 
             await _discordClient.StartAsync();
@@ -123,7 +123,8 @@ namespace Dischatr {
             return Task.CompletedTask;
         }
         private Task DiscordClient_JoinedGuild(SocketGuild arg) {
-            arg.CurrentUser.ModifyAsync(x => x.Nickname = Nickname);
+            if (!string.IsNullOrWhiteSpace(Nickname))
+                arg.CurrentUser.ModifyAsync(x => x.Nickname = Nickname);
             return Task.CompletedTask;
         }
         private void DiscoverCommands() {
@@ -133,11 +134,11 @@ namespace Dischatr {
         }
         private void Command_ReplyingWithMessage(object sender, ChatbotCommandResponse<string> e) {
             var channel = _discordClient.GetChannel(e.OriginalMessage.Channel.Id) as IMessageChannel;
-            channel.SendMessageAsync(text: e.Data);
+            channel.SendMessageAsync(text: e.Data, messageReference: e.OriginalMessage.Reference);
         }
         private void Command_ReplyingWithEmbed(object sender, ChatbotCommandResponse<Embed> e) {
             var channel = _discordClient.GetChannel(e.OriginalMessage.Channel.Id) as IMessageChannel;
-            channel.SendMessageAsync(null, false, e.Data);
+            channel.SendMessageAsync(embed: e.Data, messageReference: e.OriginalMessage.Reference);
         }
         private void CommandService_ExceptionOccurred(object sender, Exception e) => OnExceptionOccurred(e);
 
