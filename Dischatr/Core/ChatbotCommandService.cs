@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Dischatr {
     /// <summary>
@@ -107,8 +108,11 @@ namespace Dischatr {
             try {
                 if (_commands.Any(command => command.Key.Equals(commandPacket.Key, StringComparison.InvariantCultureIgnoreCase))) {
                     var command = _commands.FirstOrDefault(command => command.Key.Equals(commandPacket.Key, StringComparison.InvariantCultureIgnoreCase));
-                    if (command != null)
-                        command.Invoke(message, commandPacket.Parameters?.ToArray());
+                    if (command != null) {
+                        Task.Run(() => {
+                            command.Invoke(message, commandPacket.Parameters?.ToArray());
+                        });
+                    }
                 }
             } catch (Exception e) { OnExceptionOccurred(e); }
         }
