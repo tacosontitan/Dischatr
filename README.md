@@ -26,8 +26,8 @@ using System;
 
 namespace Sample {
     public sealed class HelloWorldCommand : ChatbotCommand {
-        public CoinFlip() : base("hello") { }
-        public override void Invoke(SocketMessage message, string[] parameters) => OnReplyingWithMessage(new(message, "Hello World!"));
+        public HelloWorldCommand() : base("hello") { }
+        public override void Invoke(SocketMessage message, string[] parameters) => Reply(new(message, "Hello World!"));
     }
 }
 ```
